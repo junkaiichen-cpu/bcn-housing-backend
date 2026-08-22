@@ -30,15 +30,14 @@ app.add_middleware(
 )
 
 # 优先读取环境变量，若无则使用兜底 Key
-FALLBACK_KEY = "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"
-RAW_KEY = os.getenv("GROQ_API_KEY", FALLBACK_KEY)
+RAW_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_API_KEY = RAW_KEY.encode('ascii', 'ignore').decode('ascii').strip()
 
 # 最新的 Groq 模型候选列表（从高优先到低优先）
+# Groq 最新官方推荐稳定模型列表
 MODEL_CANDIDATES = [
     "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "mixtral-8x7b-32768"
+    "llama-3.1-8b-instant"
 ]
 
 BCN_DATABASE: Dict[str, Dict[str, Any]] = {
