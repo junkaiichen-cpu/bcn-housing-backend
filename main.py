@@ -1,6 +1,7 @@
 import sys
 import os
 
+# 清理代理设置，确保 API 请求畅通
 os.environ.pop("HTTP_PROXY", None)
 os.environ.pop("HTTPS_PROXY", None)
 os.environ.pop("http_proxy", None)
@@ -17,7 +18,7 @@ from typing import Optional, Dict, Any, List
 app = FastAPI(
     title="Barcelona Real Estate Intelligence & Risk Engine",
     description="专为巴塞罗那全域打造的权威房产多维估值、全套街区匹配、租务风控与投资精算系统",
-    version="6.0.0"
+    version="6.1.0"
 )
 
 app.add_middleware(
@@ -28,12 +29,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-RAW_KEY = os.getenv("GROQ_API_KEY", "")
+# 优先读取环境变量，若无则使用兜底 Key
+FALLBACK_KEY = "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"
+RAW_KEY = os.getenv("GROQ_API_KEY", FALLBACK_KEY)
 GROQ_API_KEY = RAW_KEY.encode('ascii', 'ignore').decode('ascii').strip()
 
+# 最新的 Groq 模型候选列表（从高优先到低优先）
 MODEL_CANDIDATES = [
+    "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
-    "llama3-8b-8192",
     "mixtral-8x7b-32768"
 ]
 
@@ -141,6 +145,7 @@ class PropertyEvaluationRequest(BaseModel):
     floor_level: Optional[str] = Field("Middle", description="楼层")
     has_elevator: Optional[bool] = Field(True, description="是否有电梯")
     condition: Optional[str] = Field("good", description="房屋状况")
+    description: Optional[str] = Field(None, description="自由补充表达或特殊要求") # 支持自由描述
 
 class LegalComplianceRequest(BaseModel):
     barrio: str = Field(..., description="街区名称")
@@ -158,6 +163,8 @@ def call_groq_llm(prompt: str, system_prompt: str) -> Dict[str, Any]:
         "Authorization": f"Bearer {clean_key}",
         "Content-Type": "application/json; charset=utf-8"
     }
+    
+    last_err_msg = ""
     for model_name in MODEL_CANDIDATES:
         payload = {
             "model": model_name,
@@ -179,9 +186,13 @@ def call_groq_llm(prompt: str, system_prompt: str) -> Dict[str, Any]:
             res_data = response.json()
             if response.status_code == 200 and "choices" in res_data:
                 return json.loads(res_data["choices"][0]["message"]["content"])
-        except Exception:
+            else:
+                last_err_msg = res_data.get("error", {}).get("message", response.text)
+        except Exception as e:
+            last_err_msg = str(e)
             continue
-    raise HTTPException(status_code=500, detail="Groq LLM 算力引擎调用异常")
+            
+    raise HTTPException(status_code=500, detail=f"Groq LLM 算力引擎调用异常: {last_err_msg}")
 
 @app.post("/api/evaluate")
 @app.post("/api/evaluate-property")
@@ -225,7 +236,8 @@ async def evaluate_property(req: PropertyEvaluationRequest):
         prompt = f'''
 请针对巴塞罗那房产生成 JSON 格式评估报告：
 - District: {matched_barrio} (包含子区域: {db['sub_barrios']})
-- 具体地址: {req.address or '未提供'}
+- 具体地址: {req.address or '未提供具体门牌'}
+- 用户自由表达/补充需求: {req.description or '无补充'}
 - 租赁/交易模式: {req.intent} ({req.rental_type})
 - 提交价格: {req.price}€ | 公允计算估值: {adj_fair_val}€ | 偏差: {variance_pct}%
 - 指标数据: {json.dumps(metrics, ensure_ascii=False)}
@@ -236,19 +248,19 @@ async def evaluate_property(req: PropertyEvaluationRequest):
      "rating": "强烈推荐 / 价格合理 / 偏贵溢价 / 不建议考虑",
      "adjusted_fair_value": "{adj_fair_val}€",
      "variance_percentage": "{variance_pct}%",
-     "value_verdict": "价格合理度综合评语"
+     "value_verdict": "价格合理度综合评语，结合用户补充表达给出评估"
   }},
-  "location_and_address_analysis": "结合具体地址或该街区的地段优势分析",
+  "location_and_address_analysis": "结合具体地址、街区特色以及用户补充要求进行具体分析",
   "district_profile": {{
      "livability_score": "{db['livability_score']}/10",
      "safety_score": "{db['safety_score']}/10",
      "key_pros": {json.dumps(db['pros'], ensure_ascii=False)},
      "key_cons": {json.dumps(db['cons'], ensure_ascii=False)}
   }},
-  "actionable_negotiation_strategy": "具体议价/谈判策略"
+  "actionable_negotiation_strategy": "针对当前房源及价格的具体议价/谈判策略"
 }}
 '''
-        result = call_groq_llm(prompt, "You are a Barcelona real estate appraiser. Reply in valid JSON.")
+        result = call_groq_llm(prompt, "You are an expert Barcelona real estate appraiser. Reply in valid JSON.")
         return {"status": "success", "data": result}
     except Exception as e:
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
