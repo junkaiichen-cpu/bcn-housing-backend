@@ -18,7 +18,7 @@ from typing import Optional, Dict, Any, List
 app = FastAPI(
     title="Barcelona Real Estate Intelligence & Risk Engine",
     description="专为巴塞罗那全域打造的权威房产多维估值、全套街区匹配、租务风控与投资精算系统",
-    version="6.1.0"
+    version="6.2.0"
 )
 
 app.add_middleware(
@@ -33,10 +33,15 @@ app.add_middleware(
 RAW_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_API_KEY = RAW_KEY.encode('ascii', 'ignore').decode('ascii').strip()
 
-# 最新 Groq 官方推荐稳定模型列表
+# 更新为 Groq 最新官方主推的强力 LLM 模型列表（自动轮询兜底）
 MODEL_CANDIDATES = [
     "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant"
+    "llama-3.1-8b-instant",
+    "meta-llama/llama-4-scout-17b-16e-instruct",
+    "qwen/qwen3-32b",
+    "openai/gpt-oss-120b",
+    "openai/gpt-oss-20b",
+    "groq/compound"
 ]
 
 BCN_DATABASE: Dict[str, Dict[str, Any]] = {
