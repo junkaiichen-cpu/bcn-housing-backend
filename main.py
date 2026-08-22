@@ -33,8 +33,7 @@ app.add_middleware(
 RAW_KEY = os.getenv("GROQ_API_KEY", "")
 GROQ_API_KEY = RAW_KEY.encode('ascii', 'ignore').decode('ascii').strip()
 
-# 最新的 Groq 模型候选列表（从高优先到低优先）
-# Groq 最新官方推荐稳定模型列表
+# 最新 Groq 官方推荐稳定模型列表
 MODEL_CANDIDATES = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant"
@@ -144,7 +143,7 @@ class PropertyEvaluationRequest(BaseModel):
     floor_level: Optional[str] = Field("Middle", description="楼层")
     has_elevator: Optional[bool] = Field(True, description="是否有电梯")
     condition: Optional[str] = Field("good", description="房屋状况")
-    description: Optional[str] = Field(None, description="自由补充表达或特殊要求") # 支持自由描述
+    description: Optional[str] = Field(None, description="自由补充表达或特殊要求")
 
 class LegalComplianceRequest(BaseModel):
     barrio: str = Field(..., description="街区名称")
