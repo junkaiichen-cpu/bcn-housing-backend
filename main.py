@@ -3,7 +3,7 @@ import json
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import requests
 
 app = FastAPI()
@@ -20,8 +20,8 @@ app.add_middleware(
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 class EvaluationRequest(BaseModel):
-    eval_type: str  # 'rent' or 'investment'
-    lease_mode: str # 'complete', 'room', 'temporal', 'coliving'
+    eval_type: str
+    lease_mode: str
     district: str
     neighborhood: Optional[str] = ""
     address: Optional[str] = ""
@@ -29,13 +29,13 @@ class EvaluationRequest(BaseModel):
     size: float
     bedrooms: int
     bathrooms: Optional[int] = 1
-    floor: Optional[str] = "中间楼层 (Planta Media)"
+    floor: Optional[str] = "3-5楼 (Planta Media)"
     condition: str
     elevator: bool
     balcony: bool
-    furnished: Optional[str] = "带全套家具"
+    furnished: Optional[str] = "带全套家具 (Furnished)"
     energy_certificate: Optional[str] = "未知"
-    user_custom_requirements: Optional[str] = "" # 用户自定义需求（用于匹配/分析）
+    user_custom_requirements: Optional[str] = ""
 
 @app.post("/api/evaluate")
 async def evaluate_property(req: EvaluationRequest):
@@ -101,6 +101,6 @@ async def evaluate_property(req: EvaluationRequest):
             analysis_markdown = res_data["choices"][0]["message"]["content"]
             return {"status": "success", "analysis": analysis_markdown}
         else:
-            raise HTTPException(status_code=500, detail="AI Service Response Error")
+            raise HTTPException(status_code=500, detail=f"AI Service Error: {res_data}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
