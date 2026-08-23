@@ -3,7 +3,6 @@ RENTAL_TYPE_LABELS = {
     "studio": {"label_zh": "Studio", "label_en": "Studio"},
     "private_room": {"label_zh": "独立卧室", "label_en": "Private room"},
     "shared_room": {"label_zh": "共享卧室", "label_en": "Shared room"},
-    # Backward compatibility for the original UI/API.
     "room": {"label_zh": "独立卧室", "label_en": "Private room"},
 }
 
@@ -27,6 +26,20 @@ CONTRACT_TYPE_LABELS = {
     "ROOM": "合租房间合同",
 }
 
+# Accept both internal enum values and the labels users may paste/select.
+CONTRACT_TYPE_ALIASES = {
+    "长期住宅合同": "LAU_LONG_TERM",
+    "季节性 / 临时租赁合同": "TEMPORADA",
+    "合租房间合同": "ROOM",
+    "Contrato de vivienda habitual": "LAU_LONG_TERM",
+    "Contrato de temporada": "TEMPORADA",
+    "Contrato de habitación": "ROOM",
+}
+
+
+def normalize_contract_type(value):
+    return CONTRACT_TYPE_ALIASES.get(value, value or "LAU_LONG_TERM")
+
 
 def normalize_rental_type(value: str):
     return RENTAL_TYPE_LABELS.get(value, {"label_zh": value or "未指定", "label_en": value or "Unspecified"})
@@ -46,38 +59,20 @@ def _assessment(difference_percent: float):
 
 def compare_user_price(user_price, estimated_monthly_rent, estimated_min, estimated_max):
     if user_price is None or float(user_price) <= 0:
-        return {
-            "provided": False,
-            "period": "monthly",
-            "amount": None,
-            "difference_percent": None,
-            "assessment": "not_provided",
-        }
-
+        return {"provided": False, "period": "monthly", "amount": None, "difference_percent": None, "assessment": "not_provided", "estimated_range": {"min": estimated_min, "max": estimated_max}}
     amount = float(user_price)
-    difference_percent = round((amount - estimated_monthly_rent) / estimated_monthly_rent * 100, 2)
-    assessment = _assessment(difference_percent)
+    difference_percent = round((amount - estimated_monthly_rent) / estimated_monthly_rent * 100, 2) if estimated_monthly_rent else None
+    assessment = _assessment(difference_percent) if difference_percent is not None else "unknown"
     if estimated_min <= amount <= estimated_max:
         assessment = "within_expected"
-
-    return {
-        "provided": True,
-        "period": "monthly",
-        "amount": round(amount, 2),
-        "difference_percent": difference_percent,
-        "assessment": assessment,
-        "estimated_range": {"min": estimated_min, "max": estimated_max},
-    }
+    return {"provided": True, "period": "monthly", "amount": round(amount, 2), "difference_percent": difference_percent, "assessment": assessment, "estimated_range": {"min": estimated_min, "max": estimated_max}}
 
 
-def build_valuation_benchmark(
-    *, estimated_monthly_rent, estimated_min, estimated_max, area_sqm,
-    avg_rent_sqm, loc, rental_type, floor_level, has_elevator, condition,
-    contract_type,
-):
+def build_valuation_benchmark(*, estimated_monthly_rent, estimated_min, estimated_max, area_sqm, avg_rent_sqm, loc, rental_type, floor_level, has_elevator, condition, contract_type):
     monthly_per_sqm_min = estimated_min / area_sqm if area_sqm else 0
     monthly_per_sqm_max = estimated_max / area_sqm if area_sqm else 0
     rental = normalize_rental_type(rental_type)
+    contract = normalize_contract_type(contract_type)
     return {
         "estimated_rent": {"label": "预测月租", "value": f"€{estimated_min:,.0f}–€{estimated_max:,.0f} / 月"},
         "price_per_sqm": {"label": "预测单价", "value": f"€{monthly_per_sqm_min:,.1f}–€{monthly_per_sqm_max:,.1f} / m² / 月"},
@@ -87,6 +82,6 @@ def build_valuation_benchmark(
         "floor": {"label": "楼层", "value": FLOOR_LABELS.get(floor_level, floor_level or "未指定")},
         "elevator": {"label": "电梯", "value": "有" if has_elevator else "无"},
         "condition": {"label": "房屋状况", "value": CONDITION_LABELS.get(condition, condition or "未指定")},
-        "contract_type": {"label": "合同类型", "value": CONTRACT_TYPE_LABELS.get(contract_type, contract_type or "未指定")},
+        "contract_type": {"label": "合同类型", "value": CONTRACT_TYPE_LABELS.get(contract, contract or "未指定")},
         "market_rent_sqm": {"label": "区域租金基准", "value": f"€{avg_rent_sqm:g} / m² / 月"},
     }
