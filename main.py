@@ -14,7 +14,10 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-LEGACY_COMMIT = "2a671c4636c0a2133ccd4cf4d73a4a7057a6b0a0"
+# Use the reachable commit that contains the original regional engine.
+# The previous value was a Git blob SHA, not a commit/ref, so Render could not
+# download it and the service failed during module import.
+LEGACY_COMMIT = "d6a31023e6c870280c9d39298143f55435ff3ccf"
 LEGACY_URL = f"https://raw.githubusercontent.com/junkaiichen-cpu/bcn-housing-backend/{LEGACY_COMMIT}/main.py"
 
 
