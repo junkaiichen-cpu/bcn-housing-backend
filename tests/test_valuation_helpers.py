@@ -1,6 +1,11 @@
 import unittest
 
-from valuation_helpers import normalize_rental_type, compare_user_price, build_valuation_benchmark
+from valuation_helpers import (
+    build_valuation_benchmark,
+    compare_user_price,
+    normalize_contract_type,
+    normalize_rental_type,
+)
 
 
 class ValuationHelperTests(unittest.TestCase):
@@ -8,6 +13,7 @@ class ValuationHelperTests(unittest.TestCase):
         result = compare_user_price(None, 1350.0, 1280.0, 1420.0)
         self.assertFalse(result["provided"])
         self.assertEqual(result["assessment"], "not_provided")
+        self.assertEqual(result["estimated_range"]["max"], 1420.0)
 
     def test_monthly_user_price_is_compared_to_prediction(self):
         result = compare_user_price(1450.0, 1350.0, 1280.0, 1420.0)
@@ -20,6 +26,11 @@ class ValuationHelperTests(unittest.TestCase):
         self.assertEqual(normalize_rental_type("studio")["label_zh"], "Studio")
         self.assertEqual(normalize_rental_type("private_room")["label_zh"], "独立卧室")
         self.assertEqual(normalize_rental_type("shared_room")["label_zh"], "共享卧室")
+
+    def test_contract_labels_accept_user_facing_translation(self):
+        self.assertEqual(normalize_contract_type("长期住宅合同"), "LAU_LONG_TERM")
+        self.assertEqual(normalize_contract_type("季节性 / 临时租赁合同"), "TEMPORADA")
+        self.assertEqual(normalize_contract_type("合租房间合同"), "ROOM")
 
     def test_benchmark_contains_core_metrics(self):
         benchmark = build_valuation_benchmark(
