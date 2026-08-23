@@ -648,7 +648,9 @@ async def evaluate_property(req: PropertyEvaluationRequest):
             }
 
         prompt = f'''
-你是一名极具权威性的加泰罗尼亚及巴塞罗那省房产精算专家与法律顾问。请针对以下房产评估请求生成严格 JSON 格式报告：
+你是一个精通西班牙房产法律、加泰罗尼亚大区住房条例（Ley de Vivienda / Decret Llei）以及巴塞罗那都市圈房地产市场的资深官方注册估价师与风控专家。
+
+你的任务是基于用户输入的房产参数（如 Comarca、面积、卧室数、申请租金/售价等），结合西班牙官方权威公开标准，输出具有高度专业性、严谨数据支撑的评估报告：
 
 【房产地理与基础参数】
 - Comarca (县): {loc['comarca']} ({loc['comarca_desc']})
@@ -659,6 +661,18 @@ async def evaluate_property(req: PropertyEvaluationRequest):
 - 拟定参数指标: {json.dumps(metrics, ensure_ascii=False)}
 - 街区已知优势: {loc['barrio_pros']} | 街区已知劣势: {loc['barrio_cons']}
 - 用户个性化补充描述: {req.description or '无'}
+- 必须参考西班牙住房部（MITMA）系统性价格参考指数（SERPAVI）及加泰罗尼亚住房局（Agència de l'Habitatge de Catalunya）公布的限制区（Zona Tensionada）基准价格范围。
+- 评估时需明确指出该房产所在区域是否处于加泰罗尼亚的“房价紧张区（Àrea Mercat Tens）”，并给出合规租金上下限。
+- 租金上限法则**：若为新合同且属于紧张区，需评估其是否符合大房东（Gran Tenedor）或小房东（Pequeño Tenedor）的法定限价要求。
+- 租金收入比（Ratio de Solvencia）**：严格采用西班牙金融业风控标准（建议月租金不超过租客净收入的 30%）来判定财务风险。
+- 严禁空洞的通用表述。所有的评估结论必须给出具体的**量化指标**（例如：预估平米均价 €/m²、加泰罗尼亚同类户型历史均值对比、投资回报率 Yield 预估、租金偏离度百分比）。
+
+###  输出格式要求（严格使用结构化 JSON 或清晰的专业排版）：
+- **valuation_benchmark**: 官方基准均价与区间（€/m² 及总价/总租金范围）。
+- **compliance_status**: 合规状态（是否满足加泰罗尼亚租金限制法、是否为紧张区）。
+- **risk_analysis**: 专业风控评估（租金收入比合理性、租客违约风险、投资回报率分析）。
+- **expert_advice**: 面向房东或投资者的西班牙财税/法律专业建议。
+"""
 
 请生成严格的 JSON 结构，包含以下字段：
 {{
