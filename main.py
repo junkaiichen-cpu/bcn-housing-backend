@@ -10,6 +10,7 @@ import urllib.request
 from typing import Optional, Any, Dict
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -32,6 +33,26 @@ legacy = _load_legacy_engine()
 app: FastAPI = legacy["app"]
 resolve_location_data = legacy["resolve_location_data"]
 call_groq_llm = legacy["call_groq_llm"]
+
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    ).split(",")
+    if origin.strip()
+]
+app.user_middleware[:] = [
+    middleware
+    for middleware in app.user_middleware
+    if middleware.cls is not CORSMiddleware
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 from valuation_helpers import (  # noqa: E402
     CONTRACT_TYPE_LABELS,
@@ -222,3 +243,21 @@ def _remove_and_register_evaluation():
 _remove_and_register_evaluation()
 
 # Keep the legacy geography, regional comparison and rental-risk endpoints intact.
+from bcn_housing.api import (  # noqa: E402
+    router as housing_api_router,
+    validation_exception_handler,
+)
+from bcn_housing.database import SessionLocal, initialize_database  # noqa: E402
+from bcn_housing.demo_data import seed_demo_properties  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+
+app.include_router(housing_api_router)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+
+
+@app.on_event("startup")
+def initialize_housing_prototype():
+    initialize_database()
+    if os.getenv("APP_ENV", "production").lower() == "demo":
+        with SessionLocal() as db:
+            seed_demo_properties(db)
