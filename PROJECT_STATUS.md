@@ -159,3 +159,46 @@ curl -X PATCH http://localhost:8000/api/admin/leads/LEAD_ID/status \
 - Validate regional data provenance and valuation assumptions; the current prototype is not a guarantee or legal advice.
 - Add deployment-specific administrator provisioning/rotation and integration testing against the production runtime.
 - The viewing process coordinates manually. Image/report references are metadata only; this backend does not upload files or provide video infrastructure.
+
+## Live frontend integration check — 2026-11-09
+
+The integration checks used the supplied deployed origins:
+
+- Frontend: `https://bcn-housing-checker.vercel.app`
+- Backend: `https://bcn-housing-backend.onrender.com`
+- Frontend source inspected: public `junkaiichen-cpu/bcn-housing-checker` repository `main` branch.
+
+### A. Confirmed with the real deployed backend
+
+- `GET /api/properties` returned HTTP 200 with `{"properties":[]}`. The production property list is empty; no demo or real property records were returned.
+- `GET /api/geography/tree` returned HTTP 200 with the expected `status`/`data` envelope and 12 comarca entries.
+- `GET /openapi.json` returned HTTP 200 and listed the backend routes.
+- An empty `POST /api/requirements` returned HTTP 422 with the expected validation error shape. This checks validation only; no successful production customer submission was made.
+- `GET /api/admin/leads` without a token returned HTTP 401. `POST /api/admin/login` with an empty body returned HTTP 422. No credentials were guessed or attempted; successful admin login remains unverified.
+- The Vercel site returned HTTP 200, and its compiled client bundle contained the configured fallback backend hostname `bcn-housing-backend.onrender.com`.
+- Browser-origin CORS was **not working at check time**: the Vercel origin's preflight to `/api/requirements` and `/api/admin/login` returned HTTP 400 `Disallowed CORS origin`; the browser-origin property GET had no `Access-Control-Allow-Origin` response header.
+- A targeted backend code change now includes the known Vercel origin in the default CORS allowlist. This does not change an explicit Render `CORS_ALLOW_ORIGINS` override and cannot repair the already-running deployment until redeployed. Set Render's `CORS_ALLOW_ORIGINS` to include `https://bcn-housing-checker.vercel.app` (and any Vercel preview origins that need access), then redeploy and repeat preflight checks.
+
+### B. Confirmed against frontend source / local checks only
+
+- The public frontend repository's `lib/api.ts` reads `NEXT_PUBLIC_BACKEND_URL`, with a fallback to the supplied Render backend. The live client bundle includes that backend hostname. The Vercel dashboard's configured environment-variable value itself was not accessible, so it is not independently confirmed. `NEXT_PUBLIC_API_BASE_URL` is not the variable used by this frontend source.
+- The inspected frontend `main` branch calls `GET /api/geography/tree`, `POST /api/evaluate`, `POST /api/compare-regions`, and `POST /api/check-rental-risk`. Those request fields align with the inspected backend source; LLM-dependent success responses were not exercised against production.
+- The inspected frontend source contains no calls to the property listing, customer requirement, matching, viewing, or admin APIs. Those flow endpoints are therefore not integrated by the inspected branch even if they may have been exercised against a mock backend elsewhere.
+- In a temporary clone of the supplied frontend repository, `npx tsc --noEmit` passed and `npm run build` passed. `npm run lint` failed with 6 errors and 2 warnings in `app/page.tsx` (including explicit `any` and a React set-state-in-effect diagnostic). No frontend source was modified here.
+
+### B. Confirmed with mock backend only (user-reported)
+
+- The user reports that customer/admin frontend workflows passed against a temporary mock backend. The mock, test code, and test output were not present in the supplied repository or workspace, so this result could not be independently reproduced. It does not confirm compatibility with the deployed backend.
+
+### C. Not tested / remaining blockers
+
+- A successful customer requirement POST and full persistence/matching/viewing flow were not tested on production because that would create synthetic customer data. The supplied “staging backend URL” was a GitHub repository URL, not a deployed staging service. Repeat the write-flow tests on a staging deployment or with real, authorized customer data.
+- The production property database is empty. Demo properties are supported only by starting the backend with `APP_ENV=demo`; the seeder inserts three records explicitly labeled `DEMO` only when the property table is empty. Do not enable this on production unless demo records are intentionally wanted there. A separate demo/staging database is recommended.
+- Successful administrator authentication and all protected admin actions were not tested; no admin credentials were provided. Provide and use authorized credentials through a secure channel in an approved test environment.
+- Live responses from valuation, regional comparison, and rental-risk endpoints were not exercised. Frontend/backend request compatibility was checked against source only; the comparison and rental-risk success paths may invoke Groq.
+- The Vercel project settings and Render environment configuration are not accessible from this workspace. Set `NEXT_PUBLIC_BACKEND_URL` in the Vercel environment to the backend origin (without `/api`) for each deployed environment, and verify the configured value in Vercel. The checked-in frontend has a fallback, but explicit environment configuration is preferable.
+- The deployed CORS policy must be updated in Render and redeployed before browser integration can be considered confirmed.
+- The frontend test run used the public repository's `main` branch. Confirm that it is the same commit as the Vercel deployment; the deployed site build revision was not available from this workspace.
+- The frontend install reported 14 npm audit findings (8 moderate, 5 high, 1 critical); these were not investigated or fixed in this backend-only integration check.
+
+Do not treat the product as production-ready on the basis of these checks.

@@ -37,7 +37,8 @@ call_groq_llm = legacy["call_groq_llm"]
 cors_origins = [
     origin.strip()
     for origin in os.getenv(
-        "CORS_ALLOW_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+        "CORS_ALLOW_ORIGINS",
+        "http://localhost:3000,http://127.0.0.1:3000,https://bcn-housing-checker.vercel.app",
     ).split(",")
     if origin.strip()
 ]
